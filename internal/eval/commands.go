@@ -462,6 +462,16 @@ var (
 		Arity:    -2,
 		KeySpecs: KeySpecs{BeginIndex: 1},
 	}
+	hlenCmdMeta = DiceCmdMeta{
+		Name: "HLEN",
+		Info: `HLEN returns the size of set in the HSET.
+		Returns
+		This command returns the number of keys that are stored at given key.
+		`,
+		Eval:     evalHLEN,
+		Arity:    2,
+		KeySpecs: KeySpecs{BeginIndex: 1},
+	}
 	objectCmdMeta = DiceCmdMeta{
 		Name: "OBJECT",
 		Info: `OBJECT subcommand [arguments [arguments ...]]
@@ -732,6 +742,7 @@ func init() {
 	DiceCmds["PFADD"] = pfAddCmdMeta
 	DiceCmds["PFCOUNT"] = pfCountCmdMeta
 	DiceCmds["HGET"] = hgetCmdMeta
+	DiceCmds["HLEN"] = hlenCmdMeta
 	DiceCmds["PFMERGE"] = pfMergeCmdMeta
 	DiceCmds["JSON.STRLEN"] = jsonStrlenCmdMeta
 }

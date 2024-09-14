@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/bytedance/sonic"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/bytedance/sonic"
 
 	"github.com/dicedb/dice/internal/object"
 
@@ -1356,6 +1357,28 @@ func BenchmarkEvalHSET(b *testing.B) {
 	}
 }
 
+func BenchmarkEvalHLEN(b *testing.B) {
+	store := dstore.NewStore(nil)
+
+	sizes := []int{100, 1000, 10000, 10000}
+
+	for _, size := range sizes {
+		b.Run(fmt.Sprintf("EVALHLEN_%d", size), func(bench *testing.B) {
+
+			setKeys := []string{}
+			for _, curr := range sizes {
+				setKeys = append(setKeys, fmt.Sprintf("KEY_SET_%d", curr))
+			}
+			evalHSET(setKeys, store)
+
+			b.ResetTimer()
+			for i := 0; i < bench.N; i++ {
+				evalHLEN([]string{"KEY", fmt.Sprintf("FIELD_%d", i), fmt.Sprintf("VALUE_%d", i)}, store)
+			}
+		})
+	}
+}
+
 func testEvalHSET(t *testing.T, store *dstore.Store) {
 	tests := map[string]evalTestCase{
 		"wrong number of args passed": {
@@ -1367,6 +1390,93 @@ func testEvalHSET(t *testing.T, store *dstore.Store) {
 			setup:  func() {},
 			input:  []string{"key"},
 			output: []byte("-ERR wrong number of arguments for 'hset' command\r\n"),
+		},
+		"only key and field_name passed": {
+			setup:  func() {},
+			input:  []string{"KEY", "field_name"},
+			output: []byte("-ERR wrong number of arguments for 'hset' command\r\n"),
+		},
+		"key, field and value passed": {
+			setup:  func() {},
+			input:  []string{"KEY1", "field_name", "value"},
+			output: clientio.Encode(int64(1), false),
+		},
+		"key, field and value updated": {
+			setup:  func() {},
+			input:  []string{"KEY1", "field_name", "value_new"},
+			output: clientio.Encode(int64(1), false),
+		},
+		"new set of key, field and value added": {
+			setup:  func() {},
+			input:  []string{"KEY2", "field_name_new", "value_new_new"},
+			output: clientio.Encode(int64(1), false),
+		},
+		"apply with duplicate key, field and value names": {
+			setup: func() {
+				key := "KEY_MOCK"
+				field := "mock_field_name"
+				newMap := make(HashMap)
+				newMap[field] = "mock_field_value"
+
+				obj := &object.Obj{
+					TypeEncoding:   object.ObjTypeHashMap | object.ObjEncodingHashMap,
+					Value:          newMap,
+					LastAccessedAt: uint32(time.Now().Unix()),
+				}
+
+				store.Put(key, obj)
+
+			},
+			input:  []string{"KEY_MOCK", "mock_field_name", "mock_field_value"},
+			output: clientio.Encode(int64(0), false),
+		},
+		"same key -> update value, add new field and value": {
+			setup: func() {
+				key := "KEY_MOCK"
+				field := "mock_field_name"
+				mock_value := "mock_field_value"
+				newMap := make(HashMap)
+				newMap[field] = mock_value
+
+				obj := &object.Obj{
+					TypeEncoding:   object.ObjTypeHashMap | object.ObjEncodingHashMap,
+					Value:          newMap,
+					LastAccessedAt: uint32(time.Now().Unix()),
+				}
+
+				store.Put(key, obj)
+
+				// Check if the map is saved correctly in the store
+				res, err := getValueFromHashMap(key, field, store)
+
+				assert.Assert(t, err == nil)
+				assert.DeepEqual(t, res, clientio.Encode(mock_value, false))
+			},
+			input: []string{
+				"KEY_MOCK",
+				"mock_field_name",
+				"mock_field_value_new",
+				"mock_field_name_new",
+				"mock_value_new",
+			},
+			output: clientio.Encode(int64(1), false),
+		},
+	}
+
+	runEvalTests(t, tests, evalHSET, store)
+}
+
+func testEvalHLEn(t *testing.T, store *dstore.Store) {
+	tests := map[string]evalTestCase{
+		"wrong number of args passed": {
+			setup:  func() {},
+			input:  nil,
+			output: []byte("-ERR wrong number of arguments for 'hset' command\r\n"),
+		},
+		"only key passed": {
+			setup:  func() {},
+			input:  []string{"key"},
+			output: []byte("0"),
 		},
 		"only key and field_name passed": {
 			setup:  func() {},

@@ -2006,6 +2006,34 @@ func evalHSET(args []string, store *dstore.Store) []byte {
 	return clientio.Encode(numKeys, false)
 }
 
+// evalHLEN Gets Length of Set in the HSET
+//
+// If key doesn't exist, result is 0.
+//
+// Usage: HLEN key
+func evalHLEN(args []string, store *dstore.Store) []byte {
+	if len(args) < 1 {
+		return diceerrors.NewErrArity("HLEN")
+	}
+
+	key := args[0]
+
+	obj := store.Get(key)
+
+	var hashMap HashMap
+
+	if obj != nil {
+		if err := object.AssertTypeAndEncoding(obj.TypeEncoding, object.ObjTypeHashMap, object.ObjEncodingHashMap); err != nil {
+			return diceerrors.NewErrWithMessage(diceerrors.WrongTypeErr)
+		}
+		hashMap = obj.Value.(HashMap)
+	} else {
+		return clientio.RespZero
+	}
+
+	return clientio.Encode(len(hashMap), false)
+}
+
 func evalHGETALL(args []string, store *dstore.Store) []byte {
 	if len(args) != 1 {
 		return diceerrors.NewErrArity("HGETALL")
